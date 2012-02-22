@@ -5,9 +5,18 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/dustin/go-nntp/client"
 )
+
+const examplepost = `From: <nobody@example.com>
+Newsgroups: misc.test
+Subject: Code test
+Organization: spy internetworking
+
+This is a test post.
+`
 
 func maybefatal(s string, e error) {
 	if e != nil {
@@ -30,7 +39,7 @@ func main() {
 	maybefatal("authenticating", err)
 	log.Printf("Post authentication message:  %v", msg)
 
-	g, err := c.Group("comp.lang.lisp")
+	g, err := c.Group("misc.test")
 	maybefatal("grouping", err)
 	log.Printf("Got %#v", g)
 
@@ -48,4 +57,8 @@ func main() {
 	maybefatal("getting the whole thing", err)
 	log.Printf("Full message %v", id)
 	io.Copy(os.Stdout, r)
+
+	err = c.Post(strings.NewReader(examplepost))
+	maybefatal("posting", err)
+	log.Printf("Posted!")
 }

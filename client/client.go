@@ -115,6 +115,26 @@ func (c *Client) articleish(expected int) (int64, string, io.Reader, error) {
 	return n, parts[1], c.conn.DotReader(), nil
 }
 
+func (c *Client) Post(r io.Reader) error {
+	err := c.conn.PrintfLine("POST")
+	if err != nil {
+		return err
+	}
+	_, _, err = c.conn.ReadCodeLine(340)
+	if err != nil {
+		return err
+	}
+	w := c.conn.DotWriter()
+	_, err = io.Copy(w, r)
+	if err != nil {
+		// This seems really bad
+		return err
+	}
+	w.Close()
+	_, _, err = c.conn.ReadCodeLine(240)
+	return err
+}
+
 func (c *Client) Command(cmd string, expectCode int) (int, string, error) {
 	err := c.conn.PrintfLine(cmd)
 	if err != nil {

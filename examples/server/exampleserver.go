@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/textproto"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -139,6 +140,21 @@ func (tb *testBackendType) GetArticle(group *nntp.Group, id string) (*nntp.Artic
 	return mkArticle(a), nil
 }
 
+// Because I suck at ring, I'm going to just post-sort these.
+type nalist []nntpserver.NumberedArticle
+
+func (n nalist) Len() int {
+	return len(n)
+}
+
+func (n nalist) Less(i, j int) bool {
+	return n[i].Num < n[j].Num
+}
+
+func (n nalist) Swap(i, j int) {
+	n[i], n[j] = n[j], n[i]
+}
+
 func (tb *testBackendType) GetArticles(group *nntp.Group,
 	from, to int64) ([]nntpserver.NumberedArticle, error) {
 
@@ -163,6 +179,9 @@ func (tb *testBackendType) GetArticles(group *nntp.Group,
 			}
 		}
 	})
+
+	sort.Sort(nalist(rv))
+
 	return rv, nil
 }
 

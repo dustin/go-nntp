@@ -2,3 +2,4 @@
 #*
 /examples/client/client
 /examples/server/server
+/examples/couchserver/couchserver

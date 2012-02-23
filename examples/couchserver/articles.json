@@ -1,0 +1,9 @@
+{
+   "_id": "_design/articles",
+   "language": "javascript",
+   "views": {
+       "list": {
+           "map": "function(doc) {\n  if (doc.type === \"article\") {\n    for (var i = 0; i < doc.headers[\"Newsgroups\"].length; i++) {\n        var g = doc.headers[\"Newsgroups\"][i]\n        emit([g, doc.nums[g]], null);\n    }\n  }\n}\n"
+       }
+   }
+}

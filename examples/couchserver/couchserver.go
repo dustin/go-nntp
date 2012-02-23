@@ -71,8 +71,10 @@ func (cb *couchBackend) GetGroup(name string) (*nntp.Group, error) {
 		"end_key":   name + "^",
 	}, &results)
 
-	if len(results.Rows) != 1 {
+	if len(results.Rows) < 1 {
 		return nil, nntpserver.NoSuchGroup
+	} else if len(results.Rows) > 1 {
+		log.Printf("Stupid results:  %#v", results.Rows)
 	}
 
 	gr := results.Rows[0]
@@ -176,11 +178,14 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 		group, err := cb.GetGroup(g)
 		if err == nil {
 			a.Nums[g] = group.High + 1
+		} else {
+			log.Printf("Error getting group %q:  %v", g, err)
 		}
 	}
 
 	if len(a.Nums) == 0 {
-		log.Printf("Foudn no matching groups")
+		log.Printf("Found no matching groups in %v",
+			article.Header["Newsgroups"])
 		return nntpserver.PostingFailed
 	}
 

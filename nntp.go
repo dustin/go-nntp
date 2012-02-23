@@ -1,3 +1,4 @@
+// NNTP definitions.
 package nntp
 
 import (
@@ -6,6 +7,7 @@ import (
 	"net/textproto"
 )
 
+// Posting status type for groups.
 type PostingStatus byte
 
 const (
@@ -19,6 +21,7 @@ func (ps PostingStatus) String() string {
 	return fmt.Sprintf("%c", ps)
 }
 
+// A usenet newsgroup.
 type Group struct {
 	Name        string
 	Description string
@@ -28,13 +31,19 @@ type Group struct {
 	Posting     PostingStatus
 }
 
+// An article that may appear in one or more groups.
 type Article struct {
+	// The article's headers
 	Header textproto.MIMEHeader
-	Body   io.Reader
-	Bytes  int
-	Lines  int
+	// The article's body
+	Body io.Reader
+	// Number of bytes in the article body (used by OVER/XOVER)
+	Bytes int
+	// Number of lines in the article body (used by OVER/XOVER)
+	Lines int
 }
 
+// Convenient access to the article's Message ID.
 func (a *Article) MessageId() string {
 	return a.Header.Get("Message-Id")
 }

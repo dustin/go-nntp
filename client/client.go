@@ -1,3 +1,4 @@
+// NNTP Client library.
 package nntpclient
 
 import (
@@ -10,11 +11,13 @@ import (
 	"github.com/dustin/go-nntp"
 )
 
+// The client
 type Client struct {
 	conn   *textproto.Conn
 	Banner string
 }
 
+// Connect a client to an NNTP server.
 func New(net, addr string) (*Client, error) {
 	conn, err := textproto.Dial(net, addr)
 	if err != nil {
@@ -32,6 +35,7 @@ func New(net, addr string) (*Client, error) {
 	}, nil
 }
 
+// Authenticate against an NNTP server using authinfo user/pass
 func (c *Client) Authenticate(user, pass string) (msg string, err error) {
 	err = c.conn.PrintfLine("authinfo user %s", user)
 	if err != nil {
@@ -50,6 +54,7 @@ func (c *Client) Authenticate(user, pass string) (msg string, err error) {
 	return
 }
 
+// Select a group.
 func (c *Client) Group(name string) (rv nntp.Group, err error) {
 	var msg string
 	_, msg, err = c.Command("GROUP "+name, 211)
@@ -78,6 +83,7 @@ func (c *Client) Group(name string) (rv nntp.Group, err error) {
 	return
 }
 
+// Grab an article
 func (c *Client) Article(specifier string) (int64, string, io.Reader, error) {
 	err := c.conn.PrintfLine("ARTICLE %s", specifier)
 	if err != nil {
@@ -86,6 +92,7 @@ func (c *Client) Article(specifier string) (int64, string, io.Reader, error) {
 	return c.articleish(220)
 }
 
+// Get the headers for an article
 func (c *Client) Head(specifier string) (int64, string, io.Reader, error) {
 	err := c.conn.PrintfLine("HEAD %s", specifier)
 	if err != nil {
@@ -94,6 +101,7 @@ func (c *Client) Head(specifier string) (int64, string, io.Reader, error) {
 	return c.articleish(221)
 }
 
+// Get the body of an article
 func (c *Client) Body(specifier string) (int64, string, io.Reader, error) {
 	err := c.conn.PrintfLine("BODY %s", specifier)
 	if err != nil {
@@ -115,6 +123,10 @@ func (c *Client) articleish(expected int) (int64, string, io.Reader, error) {
 	return n, parts[1], c.conn.DotReader(), nil
 }
 
+// Post a new article
+//
+// The reader should contain the entire article, headers and body in
+// RFC822ish format.
 func (c *Client) Post(r io.Reader) error {
 	err := c.conn.PrintfLine("POST")
 	if err != nil {
@@ -135,6 +147,13 @@ func (c *Client) Post(r io.Reader) error {
 	return err
 }
 
+// Send a low-level command and get a response.
+//
+// This will return an error if the code doesn't match the expectCode
+// prefix.  For example, if you specify "200", the response code MUST
+// be 200 or you'll get an error.  If you specify "2", any code from
+// 200 (inclusive) to 300 (exclusive) will be success.  An expectCode
+// of -1 disables this behavior.
 func (c *Client) Command(cmd string, expectCode int) (int, string, error) {
 	err := c.conn.PrintfLine(cmd)
 	if err != nil {

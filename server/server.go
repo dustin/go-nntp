@@ -1,3 +1,4 @@
+// Everything you need for your own NNTP server.
 package nntpserver
 
 import (
@@ -13,6 +14,7 @@ import (
 	"github.com/dustin/go-nntp"
 )
 
+// Coded NNTP error message.
 type NNTPError struct {
 	Code int
 	Msg  string
@@ -39,6 +41,8 @@ var AuthRejected = &NNTPError{452, "authorization rejected"}
 // Low-level protocol handler
 type Handler func(args []string, s *Server, c *textproto.Conn) error
 
+// When listing articles in a group, this provides local sequence
+// numbers to articles.
 type NumberedArticle struct {
 	Num     int64
 	Article *nntp.Article
@@ -56,12 +60,16 @@ type Backend interface {
 	Post(article *nntp.Article) error
 }
 
+// The server handle.
 type Server struct {
+	// Handlers are dispatched by command name.
 	Handlers map[string]Handler
-	Backend  Backend
-	group    *nntp.Group
+	// The backend (your code) that provides data
+	Backend Backend
+	group   *nntp.Group
 }
 
+// Build a new server handle request to a backend.
 func NewServer(backend Backend) *Server {
 	rv := Server{
 		Handlers: make(map[string]Handler),
@@ -102,6 +110,7 @@ func (s *Server) dispatchCommand(cmd string, args []string,
 	return handler(args, s, c)
 }
 
+// Process an NNTP session.
 func (s *Server) Process(tc *net.TCPConn) {
 	defer tc.Close()
 	c := textproto.NewConn(tc)

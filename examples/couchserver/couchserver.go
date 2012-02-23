@@ -174,7 +174,8 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 
 	a.Body = buf.String()
 
-	for _, g := range article.Header["Newsgroups"] {
+	for _, g := range strings.Split(article.Header.Get("Newsgroups"), ",") {
+		g = strings.TrimSpace(g)
 		group, err := cb.GetGroup(g)
 		if err == nil {
 			a.Nums[g] = group.High + 1

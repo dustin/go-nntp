@@ -17,11 +17,12 @@ func (l *lazyOpener) init() {
 	res, err := http.Get(l.url)
 	l.err = err
 	if err == nil {
+		defer res.Body.Close()
 		if res.StatusCode != 200 {
 			l.err = errors.New(res.Status)
+		} else {
+			l.data, l.err = ioutil.ReadAll(res.Body)
 		}
-		defer res.Body.Close()
-		l.data, l.err = ioutil.ReadAll(res.Body)
 	}
 }
 

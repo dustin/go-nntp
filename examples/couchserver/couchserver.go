@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/textproto"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -174,12 +175,10 @@ func (tb *couchBackend) AllowPost() bool {
 }
 
 func cleanupId(msgid string) string {
-	s1 := strings.TrimFunc(msgid, func(r rune) bool {
+	s := strings.TrimFunc(msgid, func(r rune) bool {
 		return r == ' ' || r == '<' || r == '>'
 	})
-	s2 := strings.Replace(s1, "/", "%2f", -1)
-	s3 := strings.Replace(s2, "+", "%2b", -1)
-	return s3
+	return url.QueryEscape(s)
 }
 
 func (cb *couchBackend) Post(article *nntp.Article) error {

@@ -18,10 +18,10 @@ func (l *lazyOpener) init() {
 	l.err = err
 	if err == nil {
 		defer res.Body.Close()
-		if res.StatusCode != 200 {
-			l.err = errors.New(res.Status)
-		} else {
+		if res.StatusCode == 200 {
 			l.data, l.err = ioutil.ReadAll(res.Body)
+		} else {
+			l.err = errors.New(res.Status)
 		}
 	}
 }

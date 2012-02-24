@@ -9,7 +9,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"net/http"
 	"net/textproto"
 	"strconv"
 	"strings"
@@ -115,21 +114,10 @@ func (cb *couchBackend) GetGroup(name string) (*nntp.Group, error) {
 }
 
 func (cb *couchBackend) mkArticle(ar Article) *nntp.Article {
-	body := make([]byte, ar.Bytes)
-	res, err := http.Get(fmt.Sprintf("%s/%s/article", cb.db.DBURL(), cleanupId(ar.MsgId)))
-	if err != nil || res.StatusCode != 200 {
-		log.Printf("Can't get original body: %v", err)
-		return nil
-	}
-	defer res.Body.Close()
-	_, err = io.ReadFull(res.Body, body)
-	if err != nil {
-		log.Printf("Can't get original body: %v", err)
-		return nil
-	}
+	url := fmt.Sprintf("%s/%s/article", cb.db.DBURL(), cleanupId(ar.MsgId))
 	return &nntp.Article{
 		Header: textproto.MIMEHeader(ar.Headers),
-		Body:   bytes.NewReader(body),
+		Body:   &lazyOpener{url, nil, nil},
 		Bytes:  ar.Bytes,
 		Lines:  ar.Lines,
 	}

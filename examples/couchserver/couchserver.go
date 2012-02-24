@@ -2,10 +2,14 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"net/textproto"
 	"strconv"
 	"strings"
@@ -25,12 +29,34 @@ type GroupResults struct {
 	Rows []GroupRow
 }
 
+type Attachment struct {
+	Type string `json:"content-type"`
+	Data []byte `json:"data"`
+}
+
+func removeSpace(r rune) rune {
+	if r == ' ' || r == '\n' || r == '\r' {
+		return -1
+	}
+	return r
+}
+
+func (a *Attachment) MarshalJSON() ([]byte, error) {
+	m := map[string]string{
+		"content_type": a.Type,
+		"data":         strings.Map(removeSpace, base64.StdEncoding.EncodeToString(a.Data)),
+	}
+	return json.Marshal(m)
+}
+
 type Article struct {
-	MsgId   string              `json:"_id"`
-	DocType string              `json:"type"`
-	Headers map[string][]string `json:"headers"`
-	Body    string              `json:"body"`
-	Nums    map[string]int64    `json:"nums"`
+	MsgId       string                 `json:"_id"`
+	DocType     string                 `json:"type"`
+	Headers     map[string][]string    `json:"headers"`
+	Bytes       int                    `json:"bytes"`
+	Lines       int                    `json:"lines"`
+	Nums        map[string]int64       `json:"nums"`
+	Attachments map[string]*Attachment `json:"_attachments"`
 }
 
 type ArticleResults struct {
@@ -88,12 +114,24 @@ func (cb *couchBackend) GetGroup(name string) (*nntp.Group, error) {
 	return &group, nil
 }
 
-func mkArticle(ar Article) *nntp.Article {
+func (cb *couchBackend) mkArticle(ar Article) *nntp.Article {
+	body := make([]byte, ar.Bytes)
+	res, err := http.Get(fmt.Sprintf("%s/%s/article", cb.db.DBURL(), cleanupId(ar.MsgId)))
+	if err != nil || res.StatusCode != 200 {
+		log.Printf("Can't get original body: %v", err)
+		return nil
+	}
+	defer res.Body.Close()
+	_, err = io.ReadFull(res.Body, body)
+	if err != nil {
+		log.Printf("Can't get original body: %v", err)
+		return nil
+	}
 	return &nntp.Article{
 		Header: textproto.MIMEHeader(ar.Headers),
-		Body:   strings.NewReader(ar.Body),
-		Bytes:  len(ar.Body),
-		Lines:  strings.Count(ar.Body, "\n"),
+		Body:   bytes.NewReader(body),
+		Bytes:  ar.Bytes,
+		Lines:  ar.Lines,
 	}
 }
 
@@ -118,7 +156,7 @@ func (cb *couchBackend) GetArticle(group *nntp.Group, id string) (*nntp.Article,
 		}
 	}
 
-	return mkArticle(ar), nil
+	return cb.mkArticle(ar), nil
 }
 
 func (cb *couchBackend) GetArticles(group *nntp.Group,
@@ -136,7 +174,7 @@ func (cb *couchBackend) GetArticles(group *nntp.Group,
 	for _, r := range results.Rows {
 		rv = append(rv, nntpserver.NumberedArticle{
 			Num:     int64(r.Key[1].(float64)),
-			Article: mkArticle(r.Article),
+			Article: cb.mkArticle(r.Article),
 		})
 	}
 
@@ -158,10 +196,11 @@ func cleanupId(msgid string) string {
 
 func (cb *couchBackend) Post(article *nntp.Article) error {
 	a := Article{
-		DocType: "article",
-		Headers: map[string][]string(article.Header),
-		Nums:    make(map[string]int64),
-		MsgId:   cleanupId(article.Header.Get("Message-Id")),
+		DocType:     "article",
+		Headers:     map[string][]string(article.Header),
+		Nums:        make(map[string]int64),
+		MsgId:       cleanupId(article.Header.Get("Message-Id")),
+		Attachments: make(map[string]*Attachment),
 	}
 
 	b := []byte{}
@@ -172,7 +211,11 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 	}
 	log.Printf("Read %d bytes of body", n)
 
-	a.Body = buf.String()
+	b = buf.Bytes()
+	a.Bytes = len(b)
+	a.Lines = bytes.Count(b, []byte{'\n'})
+
+	a.Attachments["article"] = &Attachment{"text/plain", b}
 
 	for _, g := range strings.Split(article.Header.Get("Newsgroups"), ",") {
 		g = strings.TrimSpace(g)

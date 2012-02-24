@@ -258,6 +258,8 @@ func main() {
 
 	db, err := couch.Connect(*couchUrl)
 	maybefatal(err, "Can't connect to the couch: %v", err)
+	err = ensureViews(&db)
+	maybefatal(err, "Error setting up views: %v", err)
 
 	backend := couchBackend{
 		db: &db,

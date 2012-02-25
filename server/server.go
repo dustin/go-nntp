@@ -37,6 +37,7 @@ var NotWanted = &NNTPError{435, "Article not wanted"}
 
 var AuthRequired = &NNTPError{450, "authorization required"}
 var AuthRejected = &NNTPError{452, "authorization rejected"}
+var NotAuthenticated = &NNTPError{480, "authentication required"}
 
 // Low-level protocol handler
 type Handler func(args []string, s *session, c *textproto.Conn) error

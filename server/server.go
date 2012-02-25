@@ -197,7 +197,7 @@ func handleOver(args []string, s *session, c *textproto.Conn) error {
 	if s.group == nil {
 		return NoGroupSelected
 	}
-	from, to := s.group.Low, s.group.High
+	from, to := parseRange(args[0])
 	articles, err := s.backend.GetArticles(s.group, from, to)
 	if err != nil {
 		return err

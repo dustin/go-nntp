@@ -25,6 +25,8 @@ import (
 
 var groupCacheTimeout = flag.Int("groupTimeout", 60,
 	"Time (in seconds), group cache is valid")
+var optimisticPost = flag.Bool("optimistic", false,
+	"Optimistically return success on store before storing")
 
 type GroupRow struct {
 	Group string        `json:"key"`
@@ -257,10 +259,19 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 		return nntpserver.PostingFailed
 	}
 
-	_, _, err = cb.db.Insert(&a)
-	if err != nil {
-		log.Printf("error posting article: %v", err)
-		return nntpserver.PostingFailed
+	if *optimisticPost {
+		go func() {
+			_, _, err = cb.db.Insert(&a)
+			if err != nil {
+				log.Printf("error optimistically posting article: %v", err)
+			}
+		}()
+	} else {
+		_, _, err = cb.db.Insert(&a)
+		if err != nil {
+			log.Printf("error posting article: %v", err)
+			return nntpserver.PostingFailed
+		}
 	}
 
 	return nil

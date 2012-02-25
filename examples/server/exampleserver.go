@@ -257,8 +257,8 @@ func (tb *testBackendType) Authorized() bool {
 	return true
 }
 
-func (tb *testBackendType) Authenticate(user, pass string) error {
-	return nntpserver.AuthRejected
+func (tb *testBackendType) Authenticate(user, pass string) (nntpserver.Backend, error) {
+	return nil, nntpserver.AuthRejected
 }
 
 func maybefatal(err error, f string, a ...interface{}) {

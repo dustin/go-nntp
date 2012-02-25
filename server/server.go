@@ -39,7 +39,7 @@ var AuthRequired = &NNTPError{450, "authorization required"}
 var AuthRejected = &NNTPError{452, "authorization rejected"}
 
 // Low-level protocol handler
-type Handler func(args []string, s *Server, c *textproto.Conn) error
+type Handler func(args []string, s *session, c *textproto.Conn) error
 
 // When listing articles in a group, this provides local sequence
 // numbers to articles.
@@ -55,9 +55,17 @@ type Backend interface {
 	GetArticle(group *nntp.Group, id string) (*nntp.Article, error)
 	GetArticles(group *nntp.Group, from, to int64) ([]NumberedArticle, error)
 	Authorized() bool
-	Authenticate(user, pass string) error
+	// Authenticate and optionally swap out the backend for this session.
+	// You may return nil to continue using the same backend.
+	Authenticate(user, pass string) (Backend, error)
 	AllowPost() bool
 	Post(article *nntp.Article) error
+}
+
+type session struct {
+	server  *Server
+	backend Backend
+	group   *nntp.Group
 }
 
 // The server handle.
@@ -66,7 +74,8 @@ type Server struct {
 	Handlers map[string]Handler
 	// The backend (your code) that provides data
 	Backend Backend
-	group   *nntp.Group
+	// The currently selected group.
+	group *nntp.Group
 }
 
 // Build a new server handle request to a backend.
@@ -97,12 +106,12 @@ func (e *NNTPError) Error() string {
 	return fmt.Sprintf("%d %s", e.Code, e.Msg)
 }
 
-func (s *Server) dispatchCommand(cmd string, args []string,
+func (s *session) dispatchCommand(cmd string, args []string,
 	c *textproto.Conn) (err error) {
 
-	handler, found := s.Handlers[strings.ToLower(cmd)]
+	handler, found := s.server.Handlers[strings.ToLower(cmd)]
 	if !found {
-		handler, found = s.Handlers[""]
+		handler, found = s.server.Handlers[""]
 		if !found {
 			panic("No default handler.")
 		}
@@ -114,6 +123,12 @@ func (s *Server) dispatchCommand(cmd string, args []string,
 func (s *Server) Process(tc *net.TCPConn) {
 	defer tc.Close()
 	c := textproto.NewConn(tc)
+
+	sess := &session{
+		server:  s,
+		backend: s.Backend,
+		group:   nil,
+	}
 
 	c.PrintfLine("200 Hello!")
 	for {
@@ -128,7 +143,7 @@ func (s *Server) Process(tc *net.TCPConn) {
 		if len(cmd) > 1 {
 			args = cmd[1:]
 		}
-		err = s.dispatchCommand(cmd[0], args, c)
+		err = sess.dispatchCommand(cmd[0], args, c)
 		if err != nil {
 			_, isNNTPError := err.(*NNTPError)
 			switch {
@@ -177,12 +192,12 @@ func parseRange(spec string) (low, high int64) {
    :lines metadata item
 */
 
-func handleOver(args []string, s *Server, c *textproto.Conn) error {
+func handleOver(args []string, s *session, c *textproto.Conn) error {
 	if s.group == nil {
 		return NoGroupSelected
 	}
 	from, to := s.group.Low, s.group.High
-	articles, err := s.Backend.GetArticles(s.group, from, to)
+	articles, err := s.backend.GetArticles(s.group, from, to)
 	if err != nil {
 		return err
 	}
@@ -201,7 +216,7 @@ func handleOver(args []string, s *Server, c *textproto.Conn) error {
 	return nil
 }
 
-func handleList(args []string, s *Server, c *textproto.Conn) error {
+func handleList(args []string, s *session, c *textproto.Conn) error {
 	c.PrintfLine("215 list of newsgroups follows")
 
 	ltype := "active"
@@ -222,7 +237,7 @@ References:
 :lines`)
 	}
 
-	groups, err := s.Backend.ListGroups(-1)
+	groups, err := s.backend.ListGroups(-1)
 	if err != nil {
 		return err
 	}
@@ -239,27 +254,27 @@ References:
 	return nil
 }
 
-func handleNewGroups(args []string, s *Server, c *textproto.Conn) error {
+func handleNewGroups(args []string, s *session, c *textproto.Conn) error {
 	c.PrintfLine("231 list of newsgroups follows")
 	c.PrintfLine(".")
 	return nil
 }
 
-func handleDefault(args []string, s *Server, c *textproto.Conn) error {
+func handleDefault(args []string, s *session, c *textproto.Conn) error {
 	return UnknownCommand
 }
 
-func handleQuit(args []string, s *Server, c *textproto.Conn) error {
+func handleQuit(args []string, s *session, c *textproto.Conn) error {
 	c.PrintfLine("205 bye")
 	return io.EOF
 }
 
-func handleGroup(args []string, s *Server, c *textproto.Conn) error {
+func handleGroup(args []string, s *session, c *textproto.Conn) error {
 	if len(args) < 1 {
 		return NoSuchGroup
 	}
 
-	group, err := s.Backend.GetGroup(args[0])
+	group, err := s.backend.GetGroup(args[0])
 	if err != nil {
 		return err
 	}
@@ -271,11 +286,11 @@ func handleGroup(args []string, s *Server, c *textproto.Conn) error {
 	return nil
 }
 
-func (s *Server) getArticle(args []string) (*nntp.Article, error) {
+func (s *session) getArticle(args []string) (*nntp.Article, error) {
 	if s.group == nil {
 		return nil, NoGroupSelected
 	}
-	return s.Backend.GetArticle(s.group, args[0])
+	return s.backend.GetArticle(s.group, args[0])
 }
 
 /*
@@ -300,7 +315,7 @@ func (s *Server) getArticle(args []string) (*nntp.Article, error) {
      420                   Current article number is invalid
 */
 
-func handleHead(args []string, s *Server, c *textproto.Conn) error {
+func handleHead(args []string, s *session, c *textproto.Conn) error {
 	article, err := s.getArticle(args)
 	if err != nil {
 		return err
@@ -342,7 +357,7 @@ func handleHead(args []string, s *Server, c *textproto.Conn) error {
      message-id    Article message-id
 */
 
-func handleBody(args []string, s *Server, c *textproto.Conn) error {
+func handleBody(args []string, s *session, c *textproto.Conn) error {
 	article, err := s.getArticle(args)
 	if err != nil {
 		return err
@@ -382,7 +397,7 @@ func handleBody(args []string, s *Server, c *textproto.Conn) error {
      message-id    Article message-id
 */
 
-func handleArticle(args []string, s *Server, c *textproto.Conn) error {
+func handleArticle(args []string, s *session, c *textproto.Conn) error {
 	article, err := s.getArticle(args)
 	if err != nil {
 		return err
@@ -416,8 +431,8 @@ func handleArticle(args []string, s *Server, c *textproto.Conn) error {
      441    Posting failed
 */
 
-func handlePost(args []string, s *Server, c *textproto.Conn) error {
-	if !s.Backend.AllowPost() {
+func handlePost(args []string, s *session, c *textproto.Conn) error {
+	if !s.backend.AllowPost() {
 		return PostingNotPermitted
 	}
 
@@ -429,7 +444,7 @@ func handlePost(args []string, s *Server, c *textproto.Conn) error {
 		return PostingFailed
 	}
 	article.Body = c.DotReader()
-	err = s.Backend.Post(&article)
+	err = s.backend.Post(&article)
 	if err != nil {
 		return err
 	}
@@ -437,13 +452,13 @@ func handlePost(args []string, s *Server, c *textproto.Conn) error {
 	return nil
 }
 
-func handleIHave(args []string, s *Server, c *textproto.Conn) error {
-	if !s.Backend.AllowPost() {
+func handleIHave(args []string, s *session, c *textproto.Conn) error {
+	if !s.backend.AllowPost() {
 		return NotWanted
 	}
 
 	// XXX:  See if we have it.
-	article, err := s.Backend.GetArticle(nil, args[0])
+	article, err := s.backend.GetArticle(nil, args[0])
 	if article != nil {
 		return NotWanted
 	}
@@ -455,7 +470,7 @@ func handleIHave(args []string, s *Server, c *textproto.Conn) error {
 		return PostingFailed
 	}
 	article.Body = c.DotReader()
-	err = s.Backend.Post(article)
+	err = s.backend.Post(article)
 	if err != nil {
 		return err
 	}
@@ -463,14 +478,14 @@ func handleIHave(args []string, s *Server, c *textproto.Conn) error {
 	return nil
 }
 
-func handleCap(args []string, s *Server, c *textproto.Conn) error {
+func handleCap(args []string, s *session, c *textproto.Conn) error {
 	c.PrintfLine("101 Capability list:")
 	dw := c.DotWriter()
 	defer dw.Close()
 
 	fmt.Fprintf(dw, "VERSION 2\n")
 	fmt.Fprintf(dw, "READER\n")
-	if s.Backend.AllowPost() {
+	if s.backend.AllowPost() {
 		fmt.Fprintf(dw, "POST\n")
 		fmt.Fprintf(dw, "IHAVE\n")
 	}
@@ -480,8 +495,8 @@ func handleCap(args []string, s *Server, c *textproto.Conn) error {
 	return nil
 }
 
-func handleMode(args []string, s *Server, c *textproto.Conn) error {
-	if s.Backend.AllowPost() {
+func handleMode(args []string, s *session, c *textproto.Conn) error {
+	if s.backend.AllowPost() {
 		c.PrintfLine("200 Posting allowed")
 	} else {
 		c.PrintfLine("201 Posting prohibited")
@@ -489,7 +504,7 @@ func handleMode(args []string, s *Server, c *textproto.Conn) error {
 	return nil
 }
 
-func handleAuthInfo(args []string, s *Server, c *textproto.Conn) error {
+func handleAuthInfo(args []string, s *session, c *textproto.Conn) error {
 	if len(args) < 2 {
 		return SyntaxError
 	}
@@ -497,7 +512,7 @@ func handleAuthInfo(args []string, s *Server, c *textproto.Conn) error {
 		return SyntaxError
 	}
 
-	if s.Backend.Authorized() {
+	if s.backend.Authorized() {
 		return c.PrintfLine("250 authenticated")
 	}
 
@@ -507,9 +522,12 @@ func handleAuthInfo(args []string, s *Server, c *textproto.Conn) error {
 	if strings.ToLower(parts[0]) != "authinfo" || strings.ToLower(parts[1]) != "pass" {
 		return SyntaxError
 	}
-	err = s.Backend.Authenticate(args[1], parts[2])
+	b, err := s.backend.Authenticate(args[1], parts[2])
 	if err == nil {
 		c.PrintfLine("250 authenticated")
+		if b != nil {
+			s.backend = b
+		}
 	}
 	return err
 }

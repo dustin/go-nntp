@@ -238,8 +238,8 @@ func (tb *couchBackend) Authorized() bool {
 	return true
 }
 
-func (tb *couchBackend) Authenticate(user, pass string) error {
-	return nntpserver.AuthRejected
+func (tb *couchBackend) Authenticate(user, pass string) (nntpserver.Backend, error) {
+	return nil, nntpserver.AuthRejected
 }
 
 func maybefatal(err error, f string, a ...interface{}) {

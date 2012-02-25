@@ -13,12 +13,18 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/dustin/go-nntp"
 	"github.com/dustin/go-nntp/server"
 
 	"code.google.com/p/dsallings-couch-go"
 )
+
+var groupCacheTimeout = flag.Int("groupTimeout", 60,
+	"Time (in seconds), group cache is valid")
 
 type GroupRow struct {
 	Group string        `json:"key"`
@@ -67,15 +73,37 @@ type ArticleResults struct {
 }
 
 type couchBackend struct {
-	db *couch.Database
+	db        *couch.Database
+	groups    map[string]*nntp.Group
+	grouplock sync.Mutex
 }
 
-func (cb *couchBackend) ListGroups(max int) ([]*nntp.Group, error) {
+func (cb *couchBackend) clearGroups() {
+	cb.grouplock.Lock()
+	defer cb.grouplock.Unlock()
+
+	log.Printf("Dumping group cache")
+	cb.groups = nil
+}
+
+func (cb *couchBackend) fetchGroups() error {
+	cb.grouplock.Lock()
+	defer cb.grouplock.Unlock()
+
+	if cb.groups != nil {
+		return nil
+	}
+
+	log.Printf("Filling group cache")
+
 	results := GroupResults{}
-	cb.db.Query("_design/groups/_view/list", map[string]interface{}{
+	err := cb.db.Query("_design/groups/_view/list", map[string]interface{}{
 		"group": true,
 	}, &results)
-	rv := make([]*nntp.Group, 0, 100)
+	if err != nil {
+		return err
+	}
+	cb.groups = make(map[string]*nntp.Group)
 	for _, gr := range results.Rows {
 		if gr.Value[0].(string) != "" {
 			group := nntp.Group{
@@ -85,38 +113,42 @@ func (cb *couchBackend) ListGroups(max int) ([]*nntp.Group, error) {
 				Low:         int64(gr.Value[2].(float64)),
 				High:        int64(gr.Value[3].(float64)),
 			}
-			rv = append(rv, &group)
+			cb.groups[group.Name] = &group
 		}
+	}
+
+	go func() {
+		time.Sleep(time.Duration(*groupCacheTimeout) * time.Second)
+		cb.clearGroups()
+	}()
+
+	return nil
+}
+
+func (cb *couchBackend) ListGroups(max int) ([]*nntp.Group, error) {
+	if cb.groups == nil {
+		if err := cb.fetchGroups(); err != nil {
+			return nil, err
+		}
+	}
+	rv := make([]*nntp.Group, 0, len(cb.groups))
+	for _, g := range cb.groups {
+		rv = append(rv, g)
 	}
 	return rv, nil
 }
 
 func (cb *couchBackend) GetGroup(name string) (*nntp.Group, error) {
-	results := GroupResults{}
-	cb.db.Query("_design/groups/_view/list", map[string]interface{}{
-		"group":     true,
-		"start_key": name,
-		"end_key":   name + "^",
-	}, &results)
-
-	if len(results.Rows) < 1 {
-		return nil, nntpserver.NoSuchGroup
-	} else if len(results.Rows) > 1 {
-		log.Printf("Stupid results:  %#v", results.Rows)
+	if cb.groups == nil {
+		if err := cb.fetchGroups(); err != nil {
+			return nil, err
+		}
 	}
-
-	gr := results.Rows[0]
-	group := nntp.Group{
-		Name:        gr.Group,
-		Description: gr.Value[0].(string),
-		Count:       int64(gr.Value[1].(float64)),
-		Low:         int64(gr.Value[2].(float64)),
-		High:        int64(gr.Value[3].(float64)),
-	}
-	if group.Description == "" {
+	g, exists := cb.groups[name]
+	if !exists {
 		return nil, nntpserver.NoSuchGroup
 	}
-	return &group, nil
+	return g, nil
 }
 
 func (cb *couchBackend) mkArticle(ar Article) *nntp.Article {
@@ -213,7 +245,7 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 		g = strings.TrimSpace(g)
 		group, err := cb.GetGroup(g)
 		if err == nil {
-			a.Nums[g] = group.High + 1
+			a.Nums[g] = atomic.AddInt64(&group.High, 1)
 		} else {
 			log.Printf("Error getting group %q:  %v", g, err)
 		}

@@ -216,31 +216,40 @@ func handleOver(args []string, s *session, c *textproto.Conn) error {
 	return nil
 }
 
-func handleList(args []string, s *session, c *textproto.Conn) error {
-	c.PrintfLine("215 list of newsgroups follows")
-
-	ltype := "active"
-	if len(args) > 0 {
-		ltype = strings.ToLower(args[0])
+func handleListOverviewFmt(dw io.Writer, c *textproto.Conn) error {
+	err := c.PrintfLine("215 list of newsgroups follows")
+	if err != nil {
+		return err
 	}
-
-	dw := c.DotWriter()
-	defer dw.Close()
-
-	if ltype == "overview.fmt" {
-		fmt.Fprintln(dw, `Subject:
+	_, err = fmt.Fprintln(dw, `Subject:
 From:
 Date:
 Message-ID:
 References:
 :bytes
 :lines`)
+	return err
+}
+
+func handleList(args []string, s *session, c *textproto.Conn) error {
+	ltype := "active"
+	if len(args) > 0 {
+		ltype = strings.ToLower(args[0])
+	}
+
+	if ltype == "overview.fmt" {
+		dw := c.DotWriter()
+		defer dw.Close()
+		return handleListOverviewFmt(dw, c)
 	}
 
 	groups, err := s.backend.ListGroups(-1)
 	if err != nil {
 		return err
 	}
+	c.PrintfLine("215 list of newsgroups follows")
+	dw := c.DotWriter()
+	defer dw.Close()
 	for _, g := range groups {
 		switch ltype {
 		case "active":

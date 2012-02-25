@@ -65,6 +65,7 @@ type Article struct {
 	Lines       int                    `json:"lines"`
 	Nums        map[string]int64       `json:"nums"`
 	Attachments map[string]*Attachment `json:"_attachments"`
+	Added       time.Time              `json:"added"`
 }
 
 type ArticleResults struct {
@@ -114,6 +115,7 @@ func (cb *couchBackend) fetchGroups() error {
 				Count:       int64(gr.Value[1].(float64)),
 				Low:         int64(gr.Value[2].(float64)),
 				High:        int64(gr.Value[3].(float64)),
+				Posting:     nntp.PostingPermitted,
 			}
 			cb.groups[group.Name] = &group
 		}
@@ -169,6 +171,7 @@ func (cb *couchBackend) GetArticle(group *nntp.Group, id string) (*nntp.Article,
 		results := ArticleResults{}
 		cb.db.Query("_design/articles/_view/list", map[string]interface{}{
 			"include_docs": true,
+			"reduce":       false,
 			"key":          []interface{}{group.Name, intid},
 		}, &results)
 
@@ -195,6 +198,7 @@ func (cb *couchBackend) GetArticles(group *nntp.Group,
 	results := ArticleResults{}
 	cb.db.Query("_design/articles/_view/list", map[string]interface{}{
 		"include_docs": true,
+		"reduce":       false,
 		"start_key":    []interface{}{group.Name, from},
 		"end_key":      []interface{}{group.Name, to},
 	}, &results)
@@ -227,6 +231,7 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 		Nums:        make(map[string]int64),
 		MsgId:       cleanupId(article.Header.Get("Message-Id")),
 		Attachments: make(map[string]*Attachment),
+		Added:       time.Now(),
 	}
 
 	b := []byte{}
@@ -248,6 +253,7 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 		group, err := cb.GetGroup(g)
 		if err == nil {
 			a.Nums[g] = atomic.AddInt64(&group.High, 1)
+			atomic.AddInt64(&group.Count, 1)
 		} else {
 			log.Printf("Error getting group %q:  %v", g, err)
 		}

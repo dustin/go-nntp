@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -25,7 +26,8 @@ const articlesjson = `{
    "language": "javascript",
    "views": {
        "list": {
-           "map": "function(doc) {\n  if (doc.type === \"article\") {\n    for (var i = 0; i < doc.headers[\"Newsgroups\"].length; i++) {\n        var g = doc.headers[\"Newsgroups\"][i]\n        emit([g, doc.nums[g]], null);\n    }\n  }\n}\n"
+           "map": "function(doc) {\n  if (doc.type === \"article\") {\n    for (var g in doc.nums) {\n        emit([g, doc.nums[g]], null);\n    }\n  }\n}\n",
+           "reduce": "_count"
        }
    }
 }`
@@ -48,14 +50,18 @@ func updateView(db *couch.Database, viewdata string) error {
 }
 
 func ensureViews(db *couch.Database) error {
-	err := updateView(db, groupsjson)
-	if err != nil {
-		return err
+	errg := updateView(db, groupsjson)
+	if errg != nil {
+		log.Printf("Error creating groups view %v", errg)
 	}
 
-	err = updateView(db, articlesjson)
-	if err != nil {
-		return err
+	erra := updateView(db, articlesjson)
+	if erra != nil {
+		log.Printf("Error creating articles view %v", erra)
+	}
+
+	if erra != nil || errg != nil {
+		return errors.New("Error making views")
 	}
 
 	return nil

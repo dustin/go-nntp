@@ -1,5 +1,6 @@
-*~
 #*
+*~
 /examples/client/client
-/examples/server/server
 /examples/couchserver/couchserver
+/examples/couchserver/groupcreator/groupcreator
+/examples/server/server

@@ -77,14 +77,16 @@ func (cb *couchBackend) ListGroups(max int) ([]*nntp.Group, error) {
 	}, &results)
 	rv := make([]*nntp.Group, 0, 100)
 	for _, gr := range results.Rows {
-		group := nntp.Group{
-			Name:        gr.Group,
-			Description: gr.Value[0].(string),
-			Count:       int64(gr.Value[1].(float64)),
-			Low:         int64(gr.Value[2].(float64)),
-			High:        int64(gr.Value[3].(float64)),
+		if gr.Value[0].(string) != "" {
+			group := nntp.Group{
+				Name:        gr.Group,
+				Description: gr.Value[0].(string),
+				Count:       int64(gr.Value[1].(float64)),
+				Low:         int64(gr.Value[2].(float64)),
+				High:        int64(gr.Value[3].(float64)),
+			}
+			rv = append(rv, &group)
 		}
-		rv = append(rv, &group)
 	}
 	return rv, nil
 }
@@ -110,6 +112,9 @@ func (cb *couchBackend) GetGroup(name string) (*nntp.Group, error) {
 		Count:       int64(gr.Value[1].(float64)),
 		Low:         int64(gr.Value[2].(float64)),
 		High:        int64(gr.Value[3].(float64)),
+	}
+	if group.Description == "" {
+		return nil, nntpserver.NoSuchGroup
 	}
 	return &group, nil
 }

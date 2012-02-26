@@ -100,7 +100,7 @@ func (cb *couchBackend) fetchGroups() error {
 	log.Printf("Filling group cache")
 
 	results := GroupResults{}
-	err := cb.db.Query("_design/groups/_view/list", map[string]interface{}{
+	err := cb.db.Query("_design/groups/_view/active", map[string]interface{}{
 		"group": true,
 	}, &results)
 	if err != nil {

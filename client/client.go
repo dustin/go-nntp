@@ -54,6 +54,44 @@ func (c *Client) Authenticate(user, pass string) (msg string, err error) {
 	return
 }
 
+func parsePosting(p string) nntp.PostingStatus {
+	switch p {
+	case "y":
+		return nntp.PostingPermitted
+	case "m":
+		return nntp.PostingModerated
+	}
+	return nntp.PostingNotPermitted
+}
+
+// List groups
+func (c *Client) List(sub string) (rv []nntp.Group, err error) {
+	_, _, err = c.Command("LIST "+sub, 215)
+	if err != nil {
+		return
+	}
+	var groupLines []string
+	groupLines, err = c.conn.ReadDotLines()
+	if err != nil {
+		return
+	}
+	rv = make([]nntp.Group, 0, len(groupLines))
+	for _, l := range groupLines {
+		parts := strings.Split(l, " ")
+		high, errh := strconv.ParseInt(parts[1], 10, 64)
+		low, errl := strconv.ParseInt(parts[2], 10, 64)
+		if errh == nil && errl == nil {
+			rv = append(rv, nntp.Group{
+				Name:    parts[0],
+				High:    high,
+				Low:     low,
+				Posting: parsePosting(parts[3]),
+			})
+		}
+	}
+	return
+}
+
 // Select a group.
 func (c *Client) Group(name string) (rv nntp.Group, err error) {
 	var msg string

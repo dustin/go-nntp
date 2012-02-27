@@ -23,7 +23,7 @@ import (
 	"code.google.com/p/dsallings-couch-go"
 )
 
-var groupCacheTimeout = flag.Int("groupTimeout", 60,
+var groupCacheTimeout = flag.Int("groupTimeout", 300,
 	"Time (in seconds), group cache is valid")
 var optimisticPost = flag.Bool("optimistic", false,
 	"Optimistically return success on store before storing")

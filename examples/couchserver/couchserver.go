@@ -221,7 +221,7 @@ func cleanupId(msgid string) string {
 	s := strings.TrimFunc(msgid, func(r rune) bool {
 		return r == ' ' || r == '<' || r == '>'
 	})
-	return url.QueryEscape(s)
+	return strings.Replace(url.QueryEscape(s), "@", "%40", -1)
 }
 
 func (cb *couchBackend) Post(article *nntp.Article) error {

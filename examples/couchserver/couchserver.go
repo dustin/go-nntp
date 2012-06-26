@@ -156,7 +156,7 @@ func (cb *couchBackend) GetGroup(name string) (*nntp.Group, error) {
 }
 
 func (cb *couchBackend) mkArticle(ar Article) *nntp.Article {
-	url := fmt.Sprintf("%s/%s/article", cb.db.DBURL(), cleanupId(ar.MsgId))
+	url := fmt.Sprintf("%s/%s/article", cb.db.DBURL(), cleanupId(ar.MsgId, true))
 	return &nntp.Article{
 		Header: textproto.MIMEHeader(ar.Headers),
 		Body:   &lazyOpener{url, nil, nil},
@@ -181,7 +181,7 @@ func (cb *couchBackend) GetArticle(group *nntp.Group, id string) (*nntp.Article,
 
 		ar = results.Rows[0].Article
 	} else {
-		err := cb.db.Retrieve(cleanupId(id), &ar)
+		err := cb.db.Retrieve(cleanupId(id, false), &ar)
 		if err != nil {
 			return nil, nntpserver.InvalidMessageId
 		}
@@ -217,11 +217,15 @@ func (tb *couchBackend) AllowPost() bool {
 	return true
 }
 
-func cleanupId(msgid string) string {
+func cleanupId(msgid string, escapedAt bool) string {
 	s := strings.TrimFunc(msgid, func(r rune) bool {
 		return r == ' ' || r == '<' || r == '>'
 	})
-	return strings.Replace(url.QueryEscape(s), "@", "%40", -1)
+	qe := url.QueryEscape(s)
+	if escapedAt {
+		return qe
+	}
+	return strings.Replace(qe, "%40", "@", -1)
 }
 
 func (cb *couchBackend) Post(article *nntp.Article) error {
@@ -229,7 +233,7 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 		DocType:     "article",
 		Headers:     map[string][]string(article.Header),
 		Nums:        make(map[string]int64),
-		MsgId:       cleanupId(article.Header.Get("Message-Id")),
+		MsgId:       cleanupId(article.Header.Get("Message-Id"), false),
 		Attachments: make(map[string]*Attachment),
 		Added:       time.Now(),
 	}

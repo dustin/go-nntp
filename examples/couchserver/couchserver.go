@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/syslog"
 	"net"
 	"net/textproto"
 	"net/url"
@@ -27,6 +28,8 @@ var groupCacheTimeout = flag.Int("groupTimeout", 300,
 	"Time (in seconds), group cache is valid")
 var optimisticPost = flag.Bool("optimistic", false,
 	"Optimistically return success on store before storing")
+var useSyslog = flag.Bool("syslog", false,
+	"Log to syslog")
 
 type GroupRow struct {
 	Group string        `json:"key"`
@@ -302,11 +305,19 @@ func maybefatal(err error, f string, a ...interface{}) {
 }
 
 func main() {
-
 	couchUrl := flag.String("couch", "http://localhost:5984/news",
 		"Couch DB.")
 
 	flag.Parse()
+
+	if *useSyslog {
+		sl, err := syslog.New(syslog.LOG_INFO, "nntpd")
+		if err != nil {
+			log.Fatalf("Error initializing syslog: %v", err)
+		}
+		log.SetOutput(sl)
+		log.SetFlags(0)
+	}
 
 	a, err := net.ResolveTCPAddr("tcp", ":1119")
 	maybefatal(err, "Error resolving listener: %v", err)

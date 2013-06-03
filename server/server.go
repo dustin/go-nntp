@@ -474,7 +474,7 @@ func handleIHave(args []string, s *session, c *textproto.Conn) error {
 	}
 
 	c.PrintfLine("335 send it")
-	article = new(nntp.Article)
+	article = &nntp.Article{}
 	article.Header, err = c.ReadMIMEHeader()
 	if err != nil {
 		return PostingFailed

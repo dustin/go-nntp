@@ -42,8 +42,8 @@ type testBackendType struct {
 }
 
 var testBackend = testBackendType{
-	groups:   make(map[string]*groupStorage),
-	articles: make(map[string]*articleStorage),
+	groups:   map[string]*groupStorage{},
+	articles: map[string]*articleStorage{},
 }
 
 func init() {
@@ -67,7 +67,7 @@ func init() {
 }
 
 func (tb *testBackendType) ListGroups(max int) ([]*nntp.Group, error) {
-	rv := make([]*nntp.Group, 0, 100)
+	rv := []*nntp.Group{}
 	for _, g := range tb.groups {
 		rv = append(rv, g.group)
 	}
@@ -169,7 +169,7 @@ func (tb *testBackendType) GetArticles(group *nntp.Group,
 
 	log.Printf("Getting articles from %d to %d", from, to)
 
-	rv := make([]nntpserver.NumberedArticle, 0, maxArticles)
+	rv := []nntpserver.NumberedArticle{}
 	gs.articles.Do(func(v interface{}) {
 		if v != nil {
 			if aref, ok := v.(articleRef); ok {

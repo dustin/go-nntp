@@ -49,14 +49,18 @@ var testBackend = testBackendType{
 func init() {
 
 	testBackend.groups["alt.test"] = &groupStorage{
-		group: &nntp.Group{"alt.test", "A test.",
-			0, 0, 0, nntp.PostingNotPermitted},
+		group: &nntp.Group{
+			Name:        "alt.test",
+			Description: "A test.",
+			Posting:     nntp.PostingNotPermitted},
 		articles: ring.New(maxArticles),
 	}
 
 	testBackend.groups["misc.test"] = &groupStorage{
-		group: &nntp.Group{"misc.test", "More testing.",
-			0, 0, 0, nntp.PostingPermitted},
+		group: &nntp.Group{
+			Name:        "misc.test",
+			Description: "More testing.",
+			Posting:     nntp.PostingPermitted},
 		articles: ring.New(maxArticles),
 	}
 
@@ -173,7 +177,10 @@ func (tb *testBackendType) GetArticles(group *nntp.Group,
 					a, ok := tb.articles[aref.msgid]
 					if ok {
 						article := mkArticle(a)
-						rv = append(rv, nntpserver.NumberedArticle{aref.num, article})
+						rv = append(rv,
+							nntpserver.NumberedArticle{
+								Num:     aref.num,
+								Article: article})
 					}
 				}
 			}

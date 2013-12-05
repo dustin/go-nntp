@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"code.google.com/p/dsallings-couch-go"
+	"github.com/dustin/go-couch"
 )
 
 const groupsjson = `{

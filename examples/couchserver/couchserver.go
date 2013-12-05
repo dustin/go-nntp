@@ -21,7 +21,7 @@ import (
 	"github.com/dustin/go-nntp"
 	"github.com/dustin/go-nntp/server"
 
-	"code.google.com/p/dsallings-couch-go"
+	"github.com/dustin/go-couch"
 )
 
 var groupCacheTimeout = flag.Int("groupTimeout", 300,

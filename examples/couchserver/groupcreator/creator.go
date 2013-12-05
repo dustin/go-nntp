@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"code.google.com/p/dsallings-couch-go"
+	"github.com/dustin/go-couch"
 )
 
 var wg sync.WaitGroup

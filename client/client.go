@@ -1,4 +1,4 @@
-// NNTP Client library.
+// Package nntpclient provides an NNTP Client.
 package nntpclient
 
 import (
@@ -11,13 +11,13 @@ import (
 	"github.com/dustin/go-nntp"
 )
 
-// The client
+// Client is an NNTP client.
 type Client struct {
 	conn   *textproto.Conn
 	Banner string
 }
 
-// Connect a client to an NNTP server.
+// New connects a client to an NNTP server.
 func New(net, addr string) (*Client, error) {
 	conn, err := textproto.Dial(net, addr)
 	if err != nil {
@@ -92,7 +92,7 @@ func (c *Client) List(sub string) (rv []nntp.Group, err error) {
 	return
 }
 
-// Select a group.
+// Group selects a group.
 func (c *Client) Group(name string) (rv nntp.Group, err error) {
 	var msg string
 	_, msg, err = c.Command("GROUP "+name, 211)
@@ -121,7 +121,7 @@ func (c *Client) Group(name string) (rv nntp.Group, err error) {
 	return
 }
 
-// Grab an article
+// Article grabs an article
 func (c *Client) Article(specifier string) (int64, string, io.Reader, error) {
 	err := c.conn.PrintfLine("ARTICLE %s", specifier)
 	if err != nil {
@@ -130,7 +130,7 @@ func (c *Client) Article(specifier string) (int64, string, io.Reader, error) {
 	return c.articleish(220)
 }
 
-// Get the headers for an article
+// Head gets the headers for an article
 func (c *Client) Head(specifier string) (int64, string, io.Reader, error) {
 	err := c.conn.PrintfLine("HEAD %s", specifier)
 	if err != nil {
@@ -139,7 +139,7 @@ func (c *Client) Head(specifier string) (int64, string, io.Reader, error) {
 	return c.articleish(221)
 }
 
-// Get the body of an article
+// Body gets the body of an article
 func (c *Client) Body(specifier string) (int64, string, io.Reader, error) {
 	err := c.conn.PrintfLine("BODY %s", specifier)
 	if err != nil {
@@ -185,7 +185,7 @@ func (c *Client) Post(r io.Reader) error {
 	return err
 }
 
-// Send a low-level command and get a response.
+// Command sends a low-level command and get a response.
 //
 // This will return an error if the code doesn't match the expectCode
 // prefix.  For example, if you specify "200", the response code MUST

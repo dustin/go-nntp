@@ -153,7 +153,7 @@ func (cb *couchBackend) GetGroup(name string) (*nntp.Group, error) {
 	}
 	g, exists := cb.groups[name]
 	if !exists {
-		return nil, nntpserver.NoSuchGroup
+		return nil, nntpserver.ErrNoSuchGroup
 	}
 	return g, nil
 }
@@ -179,14 +179,14 @@ func (cb *couchBackend) GetArticle(group *nntp.Group, id string) (*nntp.Article,
 		}, &results)
 
 		if len(results.Rows) != 1 {
-			return nil, nntpserver.InvalidArticleNumber
+			return nil, nntpserver.ErrInvalidArticleNumber
 		}
 
 		ar = results.Rows[0].Article
 	} else {
 		err := cb.db.Retrieve(cleanupId(id, false), &ar)
 		if err != nil {
-			return nil, nntpserver.InvalidMessageId
+			return nil, nntpserver.ErrInvalidMessageID
 		}
 	}
 
@@ -269,7 +269,7 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 	if len(a.Nums) == 0 {
 		log.Printf("Found no matching groups in %v",
 			article.Header["Newsgroups"])
-		return nntpserver.PostingFailed
+		return nntpserver.ErrPostingFailed
 	}
 
 	if *optimisticPost {
@@ -283,7 +283,7 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 		_, _, err = cb.db.Insert(&a)
 		if err != nil {
 			log.Printf("error posting article: %v", err)
-			return nntpserver.PostingFailed
+			return nntpserver.ErrPostingFailed
 		}
 	}
 
@@ -295,7 +295,7 @@ func (tb *couchBackend) Authorized() bool {
 }
 
 func (tb *couchBackend) Authenticate(user, pass string) (nntpserver.Backend, error) {
-	return nil, nntpserver.AuthRejected
+	return nil, nntpserver.ErrAuthRejected
 }
 
 func maybefatal(err error, f string, a ...interface{}) {

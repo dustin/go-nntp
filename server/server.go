@@ -1,4 +1,4 @@
-// Everything you need for your own NNTP server.
+// Package nnntpserver provides everything you need for your own NNTP server.
 package nntpserver
 
 import (
@@ -14,42 +14,68 @@ import (
 	"github.com/dustin/go-nntp"
 )
 
-// Coded NNTP error message.
+// An NNTPError is a coded NNTP error message.
 type NNTPError struct {
 	Code int
 	Msg  string
 }
 
-var NoSuchGroup = &NNTPError{411, "No such newsgroup"}
+// ErrNoSuchGroup is returned for a request for a group that can't be found.
+var ErrNoSuchGroup = &NNTPError{411, "No such newsgroup"}
 
-var NoGroupSelected = &NNTPError{412, "No newsgroup selected"}
+// ErrNoSuchGroup is returned for a request that requires a current
+// group when none has been selected.
+var ErrNoGroupSelected = &NNTPError{412, "No newsgroup selected"}
 
-var InvalidMessageId = &NNTPError{430, "No article with that message-id"}
-var InvalidArticleNumber = &NNTPError{423, "No article with that number"}
-var NoCurrentArticle = &NNTPError{420, "Current article number is invalid"}
+// ErrInvalidMessageID is returned when a message is requested that can't be found.
+var ErrInvalidMessageID = &NNTPError{430, "No article with that message-id"}
 
-var UnknownCommand = &NNTPError{500, "Unknown command"}
-var SyntaxError = &NNTPError{501, "not supported, or syntax error"}
+// ErrInvalidArticleNumber is returned when an article is requested that can't be found.
+var ErrInvalidArticleNumber = &NNTPError{423, "No article with that number"}
 
-var PostingNotPermitted = &NNTPError{440, "Posting not permitted"}
-var PostingFailed = &NNTPError{441, "posting failed"}
-var NotWanted = &NNTPError{435, "Article not wanted"}
+// ErrNoCurrentArticle is returned when a command is executed that
+// requires a current article when one has not been selected.
+var ErrNoCurrentArticle = &NNTPError{420, "Current article number is invalid"}
 
-var AuthRequired = &NNTPError{450, "authorization required"}
-var AuthRejected = &NNTPError{452, "authorization rejected"}
-var NotAuthenticated = &NNTPError{480, "authentication required"}
+// ErrUnknownCommand is returned for unknown comands.
+var ErrUnknownCommand = &NNTPError{500, "Unknown command"}
 
-// Low-level protocol handler
+// ErrSyntax is returned when a command can't be parsed.
+var ErrSyntax = &NNTPError{501, "not supported, or syntax error"}
+
+// ErrPostingNotPermitted is returned as the response to an attempt to
+// post an article where posting is not permitted.
+var ErrPostingNotPermitted = &NNTPError{440, "Posting not permitted"}
+
+// ErrPostingFailed is returned when an attempt to post an article fails.
+var ErrPostingFailed = &NNTPError{441, "posting failed"}
+
+// ErrNotWanted is returned when an attempt to post an article is
+// rejected due the server not wanting the article.
+var ErrNotWanted = &NNTPError{435, "Article not wanted"}
+
+// ErrAuthRequired is returned to indicate authentication is required
+// to proceed.
+var ErrAuthRequired = &NNTPError{450, "authorization required"}
+
+// ErrAuthRejected is returned for invalid authentication.
+var ErrAuthRejected = &NNTPError{452, "authorization rejected"}
+
+// ErrNotAuthenticated is returned when a command is issued that requires
+// authentication, but authentication was not provided.
+var ErrNotAuthenticated = &NNTPError{480, "authentication required"}
+
+// Handler is a low-level protocol handler
 type Handler func(args []string, s *session, c *textproto.Conn) error
 
-// When listing articles in a group, this provides local sequence
-// numbers to articles.
+// A NumberedArticle provides local sequence nubers to articles When
+// listing articles in a group.
 type NumberedArticle struct {
 	Num     int64
 	Article *nntp.Article
 }
 
-// The backend that provides the things and does the stuff.
+// The Backend that provides the things and does the stuff.
 type Backend interface {
 	ListGroups(max int) ([]*nntp.Group, error)
 	GetGroup(name string) (*nntp.Group, error)
@@ -69,7 +95,7 @@ type session struct {
 	group   *nntp.Group
 }
 
-// The server handle.
+// The Server handle.
 type Server struct {
 	// Handlers are dispatched by command name.
 	Handlers map[string]Handler
@@ -79,7 +105,7 @@ type Server struct {
 	group *nntp.Group
 }
 
-// Build a new server handle request to a backend.
+// NewServer builds a new server handle request to a backend.
 func NewServer(backend Backend) *Server {
 	rv := Server{
 		Handlers: make(map[string]Handler),
@@ -195,7 +221,7 @@ func parseRange(spec string) (low, high int64) {
 
 func handleOver(args []string, s *session, c *textproto.Conn) error {
 	if s.group == nil {
-		return NoGroupSelected
+		return ErrNoGroupSelected
 	}
 	from, to := parseRange(args[0])
 	articles, err := s.backend.GetArticles(s.group, from, to)
@@ -271,7 +297,7 @@ func handleNewGroups(args []string, s *session, c *textproto.Conn) error {
 }
 
 func handleDefault(args []string, s *session, c *textproto.Conn) error {
-	return UnknownCommand
+	return ErrUnknownCommand
 }
 
 func handleQuit(args []string, s *session, c *textproto.Conn) error {
@@ -281,7 +307,7 @@ func handleQuit(args []string, s *session, c *textproto.Conn) error {
 
 func handleGroup(args []string, s *session, c *textproto.Conn) error {
 	if len(args) < 1 {
-		return NoSuchGroup
+		return ErrNoSuchGroup
 	}
 
 	group, err := s.backend.GetGroup(args[0])
@@ -298,7 +324,7 @@ func handleGroup(args []string, s *session, c *textproto.Conn) error {
 
 func (s *session) getArticle(args []string) (*nntp.Article, error) {
 	if s.group == nil {
-		return nil, NoGroupSelected
+		return nil, ErrNoGroupSelected
 	}
 	return s.backend.GetArticle(s.group, args[0])
 }
@@ -330,7 +356,7 @@ func handleHead(args []string, s *session, c *textproto.Conn) error {
 	if err != nil {
 		return err
 	}
-	c.PrintfLine("221 1 %s", article.MessageId())
+	c.PrintfLine("221 1 %s", article.MessageID())
 	dw := c.DotWriter()
 	defer dw.Close()
 	for k, v := range article.Header {
@@ -372,7 +398,7 @@ func handleBody(args []string, s *session, c *textproto.Conn) error {
 	if err != nil {
 		return err
 	}
-	c.PrintfLine("222 1 %s", article.MessageId())
+	c.PrintfLine("222 1 %s", article.MessageID())
 	dw := c.DotWriter()
 	defer dw.Close()
 	_, err = io.Copy(dw, article.Body)
@@ -412,7 +438,7 @@ func handleArticle(args []string, s *session, c *textproto.Conn) error {
 	if err != nil {
 		return err
 	}
-	c.PrintfLine("220 1 %s", article.MessageId())
+	c.PrintfLine("220 1 %s", article.MessageID())
 	dw := c.DotWriter()
 	defer dw.Close()
 
@@ -443,7 +469,7 @@ func handleArticle(args []string, s *session, c *textproto.Conn) error {
 
 func handlePost(args []string, s *session, c *textproto.Conn) error {
 	if !s.backend.AllowPost() {
-		return PostingNotPermitted
+		return ErrPostingNotPermitted
 	}
 
 	c.PrintfLine("340 Go ahead")
@@ -451,7 +477,7 @@ func handlePost(args []string, s *session, c *textproto.Conn) error {
 	var article nntp.Article
 	article.Header, err = c.ReadMIMEHeader()
 	if err != nil {
-		return PostingFailed
+		return ErrPostingFailed
 	}
 	article.Body = c.DotReader()
 	err = s.backend.Post(&article)
@@ -464,20 +490,20 @@ func handlePost(args []string, s *session, c *textproto.Conn) error {
 
 func handleIHave(args []string, s *session, c *textproto.Conn) error {
 	if !s.backend.AllowPost() {
-		return NotWanted
+		return ErrNotWanted
 	}
 
 	// XXX:  See if we have it.
 	article, err := s.backend.GetArticle(nil, args[0])
 	if article != nil {
-		return NotWanted
+		return ErrNotWanted
 	}
 
 	c.PrintfLine("335 send it")
 	article = &nntp.Article{}
 	article.Header, err = c.ReadMIMEHeader()
 	if err != nil {
-		return PostingFailed
+		return ErrPostingFailed
 	}
 	article.Body = c.DotReader()
 	err = s.backend.Post(article)
@@ -516,10 +542,10 @@ func handleMode(args []string, s *session, c *textproto.Conn) error {
 
 func handleAuthInfo(args []string, s *session, c *textproto.Conn) error {
 	if len(args) < 2 {
-		return SyntaxError
+		return ErrSyntax
 	}
 	if strings.ToLower(args[0]) != "user" {
-		return SyntaxError
+		return ErrSyntax
 	}
 
 	if s.backend.Authorized() {
@@ -530,7 +556,7 @@ func handleAuthInfo(args []string, s *session, c *textproto.Conn) error {
 	a, err := c.ReadLine()
 	parts := strings.SplitN(a, " ", 3)
 	if strings.ToLower(parts[0]) != "authinfo" || strings.ToLower(parts[1]) != "pass" {
-		return SyntaxError
+		return ErrSyntax
 	}
 	b, err := s.backend.Authenticate(args[1], parts[2])
 	if err == nil {

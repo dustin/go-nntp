@@ -85,7 +85,7 @@ func (tb *testBackendType) GetGroup(name string) (*nntp.Group, error) {
 	}
 
 	if group == nil {
-		return nil, nntpserver.NoSuchGroup
+		return nil, nntpserver.ErrNoSuchGroup
 	}
 
 	return group, nil

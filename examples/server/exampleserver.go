@@ -138,7 +138,7 @@ func (tb *testBackendType) GetArticle(group *nntp.Group, id string) (*nntp.Artic
 
 	a = tb.articles[msgId]
 	if a == nil {
-		return nil, nntpserver.InvalidMessageId
+		return nil, nntpserver.ErrInvalidMessageID
 	}
 
 	return mkArticle(a), nil
@@ -164,7 +164,7 @@ func (tb *testBackendType) GetArticles(group *nntp.Group,
 
 	gs, ok := tb.groups[group.Name]
 	if !ok {
-		return nil, nntpserver.NoSuchGroup
+		return nil, nntpserver.ErrNoSuchGroup
 	}
 
 	log.Printf("Getting articles from %d to %d", from, to)
@@ -225,7 +225,7 @@ func (tb *testBackendType) Post(article *nntp.Article) error {
 	msgId := a.headers.Get("Message-Id")
 
 	if _, ok := tb.articles[msgId]; ok {
-		return nntpserver.PostingFailed
+		return nntpserver.ErrPostingFailed
 	}
 
 	for _, g := range article.Header["Newsgroups"] {
@@ -254,7 +254,7 @@ func (tb *testBackendType) Post(article *nntp.Article) error {
 	if a.refcount > 0 {
 		tb.articles[msgId] = &a
 	} else {
-		return nntpserver.PostingFailed
+		return nntpserver.ErrPostingFailed
 	}
 
 	return nil
@@ -265,7 +265,7 @@ func (tb *testBackendType) Authorized() bool {
 }
 
 func (tb *testBackendType) Authenticate(user, pass string) (nntpserver.Backend, error) {
-	return nil, nntpserver.AuthRejected
+	return nil, nntpserver.ErrAuthRejected
 }
 
 func maybefatal(err error, f string, a ...interface{}) {

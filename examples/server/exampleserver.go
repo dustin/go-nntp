@@ -114,11 +114,11 @@ func findInRing(in *ring.Ring, f func(r interface{}) bool) *ring.Ring {
 
 func (tb *testBackendType) GetArticle(group *nntp.Group, id string) (*nntp.Article, error) {
 
-	msgId := id
+	msgID := id
 	var a *articleStorage
 
 	if intid, err := strconv.ParseInt(id, 10, 64); err == nil {
-		msgId = ""
+		msgID = ""
 		// by int ID.  Gotta go find it.
 		if groupStorage, ok := tb.groups[group.Name]; ok {
 			r := findInRing(groupStorage.articles, func(v interface{}) bool {
@@ -131,12 +131,12 @@ func (tb *testBackendType) GetArticle(group *nntp.Group, id string) (*nntp.Artic
 				return false
 			})
 			if aref, ok := r.Value.(articleRef); ok {
-				msgId = aref.msgid
+				msgID = aref.msgid
 			}
 		}
 	}
 
-	a = tb.articles[msgId]
+	a = tb.articles[msgID]
 	if a == nil {
 		return nil, nntpserver.ErrInvalidMessageID
 	}
@@ -222,9 +222,9 @@ func (tb *testBackendType) Post(article *nntp.Article) error {
 		refcount: 0,
 	}
 
-	msgId := a.headers.Get("Message-Id")
+	msgID := a.headers.Get("Message-Id")
 
-	if _, ok := tb.articles[msgId]; ok {
+	if _, ok := tb.articles[msgID]; ok {
 		return nntpserver.ErrPostingFailed
 	}
 
@@ -240,19 +240,19 @@ func (tb *testBackendType) Post(article *nntp.Article) error {
 			}
 			g.group.High++
 			g.articles.Value = articleRef{
-				msgId,
+				msgID,
 				g.group.High,
 			}
 			log.Printf("Placed %v", g.articles.Value)
 			a.refcount++
 			g.group.Count = int64(g.articles.Len())
 
-			log.Printf("Stored %v in %v", msgId, g.group.Name)
+			log.Printf("Stored %v in %v", msgID, g.group.Name)
 		}
 	}
 
 	if a.refcount > 0 {
-		tb.articles[msgId] = &a
+		tb.articles[msgID] = &a
 	} else {
 		return nntpserver.ErrPostingFailed
 	}

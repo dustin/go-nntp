@@ -1,4 +1,4 @@
-// Package nnntpserver provides everything you need for your own NNTP server.
+// Package nntpserver provides everything you need for your own NNTP server.
 package nntpserver
 
 import (

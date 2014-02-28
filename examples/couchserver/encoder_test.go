@@ -6,7 +6,7 @@ import (
 )
 
 func TestJSONMarshalling(t *testing.T) {
-	a := Attachment{
+	a := attachment{
 		"application/octet-stream",
 		[]byte("some bytes"),
 	}

@@ -41,11 +41,11 @@ func process(db *couch.Database, line string) {
 
 func main() {
 
-	couchUrl := flag.String("couch", "http://localhost:5984/news",
+	couchURL := flag.String("couch", "http://localhost:5984/news",
 		"Couch DB.")
 	flag.Parse()
 
-	db, err := couch.Connect(*couchUrl)
+	db, err := couch.Connect(*couchURL)
 	if err != nil {
 		log.Fatalf("Can't connect to couch: %v", err)
 	}

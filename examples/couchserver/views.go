@@ -48,7 +48,7 @@ func updateView(db *couch.Database, viewdata string) error {
 		return err
 	}
 	if !viewUpdateOK(r.StatusCode) {
-		return errors.New(fmt.Sprintf("Error updating view:  %v", r.Status))
+		return fmt.Errorf("error updating view:  %v", r.Status)
 	}
 	return nil
 }
@@ -65,7 +65,7 @@ func ensureViews(db *couch.Database) error {
 	}
 
 	if erra != nil || errg != nil {
-		return errors.New("Error making views")
+		return errors.New("error making views")
 	}
 
 	return nil

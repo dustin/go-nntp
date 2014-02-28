@@ -31,16 +31,16 @@ var optimisticPost = flag.Bool("optimistic", false,
 var useSyslog = flag.Bool("syslog", false,
 	"Log to syslog")
 
-type GroupRow struct {
+type groupRow struct {
 	Group string        `json:"key"`
 	Value []interface{} `json:"value"`
 }
 
-type GroupResults struct {
-	Rows []GroupRow
+type groupResults struct {
+	Rows []groupRow
 }
 
-type Attachment struct {
+type attachment struct {
 	Type string `json:"content-type"`
 	Data []byte `json:"data"`
 }
@@ -52,7 +52,7 @@ func removeSpace(r rune) rune {
 	return r
 }
 
-func (a *Attachment) MarshalJSON() ([]byte, error) {
+func (a *attachment) MarshalJSON() ([]byte, error) {
 	m := map[string]string{
 		"content_type": a.Type,
 		"data":         strings.Map(removeSpace, base64.StdEncoding.EncodeToString(a.Data)),
@@ -60,21 +60,21 @@ func (a *Attachment) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-type Article struct {
-	MsgId       string                 `json:"_id"`
+type article struct {
+	MsgID       string                 `json:"_id"`
 	DocType     string                 `json:"type"`
 	Headers     map[string][]string    `json:"headers"`
 	Bytes       int                    `json:"bytes"`
 	Lines       int                    `json:"lines"`
 	Nums        map[string]int64       `json:"nums"`
-	Attachments map[string]*Attachment `json:"_attachments"`
+	Attachments map[string]*attachment `json:"_attachments"`
 	Added       time.Time              `json:"added"`
 }
 
-type ArticleResults struct {
+type articleResults struct {
 	Rows []struct {
 		Key     []interface{} `json:"key"`
-		Article Article       `json:"doc"`
+		Article article       `json:"doc"`
 	}
 }
 
@@ -102,7 +102,7 @@ func (cb *couchBackend) fetchGroups() error {
 
 	log.Printf("Filling group cache")
 
-	results := GroupResults{}
+	results := groupResults{}
 	err := cb.db.Query("_design/groups/_view/active", map[string]interface{}{
 		"group": true,
 	}, &results)
@@ -158,8 +158,8 @@ func (cb *couchBackend) GetGroup(name string) (*nntp.Group, error) {
 	return g, nil
 }
 
-func (cb *couchBackend) mkArticle(ar Article) *nntp.Article {
-	url := fmt.Sprintf("%s/%s/article", cb.db.DBURL(), cleanupId(ar.MsgId, true))
+func (cb *couchBackend) mkArticle(ar article) *nntp.Article {
+	url := fmt.Sprintf("%s/%s/article", cb.db.DBURL(), cleanupID(ar.MsgID, true))
 	return &nntp.Article{
 		Header: textproto.MIMEHeader(ar.Headers),
 		Body:   &lazyOpener{url, nil, nil},
@@ -169,9 +169,9 @@ func (cb *couchBackend) mkArticle(ar Article) *nntp.Article {
 }
 
 func (cb *couchBackend) GetArticle(group *nntp.Group, id string) (*nntp.Article, error) {
-	var ar Article
+	var ar article
 	if intid, err := strconv.ParseInt(id, 10, 64); err == nil {
-		results := ArticleResults{}
+		results := articleResults{}
 		cb.db.Query("_design/articles/_view/list", map[string]interface{}{
 			"include_docs": true,
 			"reduce":       false,
@@ -184,7 +184,7 @@ func (cb *couchBackend) GetArticle(group *nntp.Group, id string) (*nntp.Article,
 
 		ar = results.Rows[0].Article
 	} else {
-		err := cb.db.Retrieve(cleanupId(id, false), &ar)
+		err := cb.db.Retrieve(cleanupID(id, false), &ar)
 		if err != nil {
 			return nil, nntpserver.ErrInvalidMessageID
 		}
@@ -198,7 +198,7 @@ func (cb *couchBackend) GetArticles(group *nntp.Group,
 
 	rv := make([]nntpserver.NumberedArticle, 0, 100)
 
-	results := ArticleResults{}
+	results := articleResults{}
 	cb.db.Query("_design/articles/_view/list", map[string]interface{}{
 		"include_docs": true,
 		"reduce":       false,
@@ -216,11 +216,11 @@ func (cb *couchBackend) GetArticles(group *nntp.Group,
 	return rv, nil
 }
 
-func (tb *couchBackend) AllowPost() bool {
+func (cb *couchBackend) AllowPost() bool {
 	return true
 }
 
-func cleanupId(msgid string, escapedAt bool) string {
+func cleanupID(msgid string, escapedAt bool) string {
 	s := strings.TrimFunc(msgid, func(r rune) bool {
 		return r == ' ' || r == '<' || r == '>'
 	})
@@ -231,19 +231,19 @@ func cleanupId(msgid string, escapedAt bool) string {
 	return strings.Replace(qe, "%40", "@", -1)
 }
 
-func (cb *couchBackend) Post(article *nntp.Article) error {
-	a := Article{
+func (cb *couchBackend) Post(art *nntp.Article) error {
+	a := article{
 		DocType:     "article",
-		Headers:     map[string][]string(article.Header),
+		Headers:     map[string][]string(art.Header),
 		Nums:        make(map[string]int64),
-		MsgId:       cleanupId(article.Header.Get("Message-Id"), false),
-		Attachments: make(map[string]*Attachment),
+		MsgID:       cleanupID(art.Header.Get("Message-Id"), false),
+		Attachments: make(map[string]*attachment),
 		Added:       time.Now(),
 	}
 
 	b := []byte{}
 	buf := bytes.NewBuffer(b)
-	n, err := io.Copy(buf, article.Body)
+	n, err := io.Copy(buf, art.Body)
 	if err != nil {
 		return err
 	}
@@ -253,9 +253,9 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 	a.Bytes = len(b)
 	a.Lines = bytes.Count(b, []byte{'\n'})
 
-	a.Attachments["article"] = &Attachment{"text/plain", b}
+	a.Attachments["article"] = &attachment{"text/plain", b}
 
-	for _, g := range strings.Split(article.Header.Get("Newsgroups"), ",") {
+	for _, g := range strings.Split(art.Header.Get("Newsgroups"), ",") {
 		g = strings.TrimSpace(g)
 		group, err := cb.GetGroup(g)
 		if err == nil {
@@ -268,7 +268,7 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 
 	if len(a.Nums) == 0 {
 		log.Printf("Found no matching groups in %v",
-			article.Header["Newsgroups"])
+			art.Header["Newsgroups"])
 		return nntpserver.ErrPostingFailed
 	}
 
@@ -290,11 +290,11 @@ func (cb *couchBackend) Post(article *nntp.Article) error {
 	return nil
 }
 
-func (tb *couchBackend) Authorized() bool {
+func (cb *couchBackend) Authorized() bool {
 	return true
 }
 
-func (tb *couchBackend) Authenticate(user, pass string) (nntpserver.Backend, error) {
+func (cb *couchBackend) Authenticate(user, pass string) (nntpserver.Backend, error) {
 	return nil, nntpserver.ErrAuthRejected
 }
 
@@ -305,7 +305,7 @@ func maybefatal(err error, f string, a ...interface{}) {
 }
 
 func main() {
-	couchUrl := flag.String("couch", "http://localhost:5984/news",
+	couchURL := flag.String("couch", "http://localhost:5984/news",
 		"Couch DB.")
 
 	flag.Parse()
@@ -325,7 +325,7 @@ func main() {
 	maybefatal(err, "Error setting up listener: %v", err)
 	defer l.Close()
 
-	db, err := couch.Connect(*couchUrl)
+	db, err := couch.Connect(*couchURL)
 	maybefatal(err, "Can't connect to the couch: %v", err)
 	err = ensureViews(&db)
 	maybefatal(err, "Error setting up views: %v", err)

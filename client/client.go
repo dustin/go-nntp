@@ -35,6 +35,11 @@ func New(net, addr string) (*Client, error) {
 	}, nil
 }
 
+// Close this client.
+func (c *Client) Close() error {
+	return c.conn.Close()
+}
+
 // Authenticate against an NNTP server using authinfo user/pass
 func (c *Client) Authenticate(user, pass string) (msg string, err error) {
 	err = c.conn.PrintfLine("authinfo user %s", user)

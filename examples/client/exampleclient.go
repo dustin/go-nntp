@@ -30,14 +30,14 @@ func main() {
 	maybefatal("connecting", err)
 	log.Printf("Got banner:  %v", c.Banner)
 
-	// Set the reader mode
-	_, _, err = c.Command("mode reader", 2)
-	maybefatal("setting reader mode", err)
-
 	// Authenticate
 	msg, err := c.Authenticate(user, pass)
 	maybefatal("authenticating", err)
 	log.Printf("Post authentication message:  %v", msg)
+
+	// Set the reader mode
+	_, _, err = c.Command("mode reader", 2)
+	maybefatal("setting reader mode", err)
 
 	g, err := c.Group("misc.test")
 	maybefatal("grouping", err)

@@ -28,6 +28,7 @@ func main() {
 	server, user, pass := os.Args[1], os.Args[2], os.Args[3]
 	c, err := nntpclient.New("tcp", server)
 	maybefatal("connecting", err)
+	defer c.Close()
 	log.Printf("Got banner:  %v", c.Banner)
 
 	// Authenticate

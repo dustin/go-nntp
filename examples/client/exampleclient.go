@@ -40,28 +40,33 @@ func main() {
 	_, _, err = c.Command("mode reader", 2)
 	maybefatal("setting reader mode", err)
 
+	// Select a group
 	g, err := c.Group("misc.test")
 	maybefatal("grouping", err)
 	log.Printf("Got %#v", g)
 
+	// List the gruop
 	n, id, r, err := c.Head(strconv.FormatInt(g.High-1, 10))
 	maybefatal("getting head", err)
 	log.Printf("msg %d has id %v and the following headers", n, id)
 	_, err = io.Copy(os.Stdout, r)
 	maybefatal("reading head", err)
 
+	// Get an article body
 	n, id, r, err = c.Body(strconv.FormatInt(n, 10))
 	maybefatal("getting body", err)
 	log.Printf("Body of message %v", id)
 	io.Copy(os.Stdout, r)
 	maybefatal("reading body", err)
 
+	// Get a full article
 	n, id, r, err = c.Article(strconv.FormatInt(n, 10))
 	maybefatal("getting the whole thing", err)
 	log.Printf("Full message %v", id)
 	io.Copy(os.Stdout, r)
 	maybefatal("reading the full message", err)
 
+	// Post an article
 	err = c.Post(strings.NewReader(examplepost))
 	maybefatal("posting", err)
 	log.Printf("Posted!")

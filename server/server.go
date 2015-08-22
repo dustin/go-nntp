@@ -243,11 +243,13 @@ func handleOver(args []string, s *session, c *textproto.Conn) error {
 	return nil
 }
 
-func handleListOverviewFmt(dw io.Writer, c *textproto.Conn) error {
+func handleListOverviewFmt(c *textproto.Conn) error {
 	err := c.PrintfLine("215 Order of fields in overview database.")
 	if err != nil {
 		return err
 	}
+	dw := c.DotWriter()
+	defer dw.Close()
 	_, err = fmt.Fprintln(dw, `Subject:
 From:
 Date:
@@ -265,9 +267,7 @@ func handleList(args []string, s *session, c *textproto.Conn) error {
 	}
 
 	if ltype == "overview.fmt" {
-		dw := c.DotWriter()
-		defer dw.Close()
-		return handleListOverviewFmt(dw, c)
+		return handleListOverviewFmt(c)
 	}
 
 	groups, err := s.backend.ListGroups(-1)

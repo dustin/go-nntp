@@ -244,7 +244,7 @@ func handleOver(args []string, s *session, c *textproto.Conn) error {
 }
 
 func handleListOverviewFmt(dw io.Writer, c *textproto.Conn) error {
-	err := c.PrintfLine("215 list of newsgroups follows")
+	err := c.PrintfLine("215 Order of fields in overview database.")
 	if err != nil {
 		return err
 	}

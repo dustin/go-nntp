@@ -147,9 +147,9 @@ func (s *session) dispatchCommand(cmd string, args []string,
 }
 
 // Process an NNTP session.
-func (s *Server) Process(tc *net.TCPConn) {
-	defer tc.Close()
-	c := textproto.NewConn(tc)
+func (s *Server) Process(nc net.Conn) {
+	defer nc.Close()
+	c := textproto.NewConn(nc)
 
 	sess := &session{
 		server:  s,

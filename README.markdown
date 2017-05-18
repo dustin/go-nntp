@@ -7,4 +7,4 @@ I'm still working on coming up with the exact right interfaces, but
 take a look at [the couchserver][couchserver] example to see what it
 takes to build a custom NNTP server with your own backend.
 
-[couchserver]: go-nntp/blob/master/examples/couchserver/couchserver.go
+[couchserver]: examples/couchserver/couchserver.go

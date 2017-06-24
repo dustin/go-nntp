@@ -24,6 +24,15 @@ func New(net, addr string) (*Client, error) {
 		return nil, err
 	}
 
+	return connect(conn)
+}
+
+// NewConn wraps an existing connection, for example one opened with tls.Dial
+func NewConn(conn io.ReadWriteCloser) (*Client, error) {
+	return connect(textproto.NewConn(conn))
+}
+
+func connect(conn *textproto.Conn) (*Client, error) {
 	_, msg, err := conn.ReadCodeLine(200)
 	if err != nil {
 		return nil, err

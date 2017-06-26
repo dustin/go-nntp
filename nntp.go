@@ -48,3 +48,10 @@ type Article struct {
 func (a *Article) MessageID() string {
 	return a.Header.Get("Message-Id")
 }
+
+// Capabilities represents a server's capabilities
+type Capabilities struct {
+	List []string
+	// spec unclear on if this is always int
+	Versions []string
+}

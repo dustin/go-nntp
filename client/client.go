@@ -68,6 +68,39 @@ func (c *Client) Authenticate(user, pass string) (msg string, err error) {
 	return
 }
 
+// parseVersions
+func parseVersions(caps []string) ([]string, error) {
+	if len(caps) == 0 {
+		return nil, errors.New("no capabilities found")
+	} else if !strings.HasPrefix(caps[0], "VERSION ") {
+		return nil, errors.New("version not found in capabilities")
+	}
+	return strings.Split(caps[0][8:], " "), nil
+}
+
+// Capabilities implements RFC 3977 5.2
+func (c *Client) Capabilities(keyword string) (rv *nntp.Capabilities, err error) {
+	cmd := "CAPABILITIES"
+	if keyword != "" {
+		cmd += " " + keyword
+	}
+	_, _, err = c.Command(cmd, 101)
+	if err != nil {
+		return
+	}
+	capLines, err := c.conn.ReadDotLines()
+	if err != nil {
+		return
+	}
+
+	versions, _ := parseVersions(capLines)
+	rv = &nntp.Capabilities{
+		List:     capLines,
+		Versions: versions,
+	}
+	return
+}
+
 func parsePosting(p string) nntp.PostingStatus {
 	switch p {
 	case "y":

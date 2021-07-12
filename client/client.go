@@ -2,7 +2,6 @@
 package nntpclient
 
 import (
-	"bytes"
 	"crypto/tls"
 	"errors"
 	"io"
@@ -242,33 +241,44 @@ func (c *Client) Command(cmd string, expectCode int) (int, string, error) {
 	return c.conn.ReadCodeLine(expectCode)
 }
 
-// Capabilities retrieves a list of supported caps.
+// asLines issues a command and returns the response's data block as lines.
+func (c *Client) asLines(cmd string, expectCode int) ([]string, error) {
+	_, _, err := c.Command(cmd, expectCode)
+	if err != nil {
+		return nil, err
+	}
+	return c.conn.ReadDotLines()
+}
+
+// Capabilities retrieves a list of supported capabilities.
 //
 // See https://datatracker.ietf.org/doc/html/rfc3977#section-5.2.2
 func (c *Client) Capabilities() ([]string, error) {
-	err := c.conn.PrintfLine("CAPABILITIES")
+	caps, err := c.asLines("CAPABILITIES", 101)
 	if err != nil {
 		return nil, err
 	}
-	_, _, err = c.conn.ReadCodeLine(101)
-	if err != nil {
-		return nil, err
+	for i, line := range caps {
+		caps[i] = strings.ToUpper(line)
 	}
-	b, err := io.ReadAll(c.conn.DotReader())
-	if err != nil {
-		return nil, err
-	}
-	caps := strings.Split(string(bytes.TrimSpace(b)), "\n")
 	c.capabilities = caps
 	return caps, nil
 }
 
-// GetCapability returns a complete capbility line.
+// GetCapability returns a complete capability line.
 //
-// See https://datatracker.ietf.org/doc/html/rfc3977#section-9.5
+// "Each capability line consists of one or more tokens, which MUST be
+// separated by one or more space or TAB characters."
+//
+// From https://datatracker.ietf.org/doc/html/rfc3977#section-3.3.1
 func (c *Client) GetCapability(capability string) string {
+	capability = strings.ToUpper(capability)
 	for _, capa := range c.capabilities {
-		if strings.SplitN(capa, " ", 2)[0] == capability {
+		i := strings.IndexAny(capa, "\t ")
+		if i != -1 && capa[:i] == capability {
+			return capa
+		}
+		if capa == capability {
 			return capa
 		}
 	}
@@ -276,6 +286,10 @@ func (c *Client) GetCapability(capability string) string {
 }
 
 // HasCapabilityArgument indicates whether a capability arg is supported.
+//
+// Here, "argument" means any token after the label in a capabilities response
+// line. Some, like "ACTIVE" in "LIST ACTIVE", are not command arguments but
+// rather "keyword" components of compound commands called "variants."
 //
 // See https://datatracker.ietf.org/doc/html/rfc3977#section-9.5
 func (c *Client) HasCapabilityArgument(
@@ -288,7 +302,8 @@ func (c *Client) HasCapabilityArgument(
 	if capLine == "" {
 		return false, errors.New("No such capability")
 	}
-	for _, capArg := range strings.Split(capLine, " ") {
+	argument = strings.ToUpper(argument)
+	for _, capArg := range strings.Fields(capLine)[1:] {
 		if capArg == argument {
 			return true, nil
 		}
@@ -300,41 +315,23 @@ func (c *Client) HasCapabilityArgument(
 //
 // According to the spec, the presence of an "OVER" line in the capabilities
 // response means this LIST variant is supported, so there's no reason to
-// check for it among the keywords in the LIST line, strictly speaking.
+// check for it among the keywords in the "LIST" line, strictly speaking.
 //
 // See https://datatracker.ietf.org/doc/html/rfc3977#section-3.3.2
 func (c *Client) ListOverviewFmt() ([]string, error) {
-	err := c.conn.PrintfLine("LIST OVERVIEW.FMT")
+	fields, err := c.asLines("LIST OVERVIEW.FMT", 215)
 	if err != nil {
 		return nil, err
 	}
-	_, _, err = c.conn.ReadCodeLine(215)
-	if err != nil {
-		return nil, err
-	}
-	b, err := io.ReadAll(c.conn.DotReader())
-	if err != nil {
-		return nil, err
-	}
-	fields := strings.Split(string(bytes.TrimSpace(b)), "\n")
 	return fields, nil
 }
 
 // Over returns a list of raw overview lines with tab-separated fields.
 func (c *Client) Over(specifier string) ([]string, error) {
-	err := c.conn.PrintfLine("OVER %s", specifier)
+	lines, err := c.asLines("OVER "+specifier, 224)
 	if err != nil {
 		return nil, err
 	}
-	_, _, err = c.conn.ReadCodeLine(224)
-	if err != nil {
-		return nil, err
-	}
-	b, err := io.ReadAll(c.conn.DotReader())
-	if err != nil {
-		return nil, err
-	}
-	lines := strings.Split(string(bytes.TrimSpace(b)), "\n")
 	return lines, nil
 }
 
@@ -350,8 +347,7 @@ func (c *Client) StartTLS(config *tls.Config) error {
 	if c.tls {
 		return errors.New("TLS already active")
 	}
-	err := c.conn.PrintfLine("STARTTLS")
-	_, _, err = c.conn.ReadCodeLine(382)
+	_, _, err := c.Command("STARTTLS", 382)
 	if err != nil {
 		return err
 	}

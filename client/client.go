@@ -144,6 +144,7 @@ func (c *Client) Group(name string) (rv nntp.Group, err error) {
 	parts := strings.Split(msg, " ")
 	if len(parts) != 4 {
 		err = errors.New("Don't know how to parse result: " + msg)
+		return
 	}
 	rv.Count, err = strconv.ParseInt(parts[0], 10, 64)
 	if err != nil {

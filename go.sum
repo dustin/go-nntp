@@ -1,0 +1,4 @@
+github.com/dustin/go-couch v0.0.0-20160816170231-8251128dab73 h1:YKyWSyEhJ3DYKgSpjOXpQgpxD3N+1EfIanJZj1ZEhpM=
+github.com/dustin/go-couch v0.0.0-20160816170231-8251128dab73/go.mod h1:WG/TWzFd/MRvOZ4jjna3FQ+K8AKhb2jOw4S2JMw9VKI=
+github.com/dustin/httputil v0.0.0-20170305193905-c47743f54f89 h1:A740DRjmFFdm3+GeYVfs4QN/QMOAbMw8KdsZMDhUCjQ=
+github.com/dustin/httputil v0.0.0-20170305193905-c47743f54f89/go.mod h1:ZoDWdnxro8Kesk3zrCNOHNFWtajFPSnDMjVEjGjQu/0=

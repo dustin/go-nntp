@@ -495,6 +495,9 @@ func handleIHave(args []string, s *session, c *textproto.Conn) error {
 
 	// XXX:  See if we have it.
 	article, err := s.backend.GetArticle(nil, args[0])
+	if err != nil {
+		return err
+	}
 	if article != nil {
 		return ErrNotWanted
 	}
@@ -554,6 +557,9 @@ func handleAuthInfo(args []string, s *session, c *textproto.Conn) error {
 
 	c.PrintfLine("350 Continue")
 	a, err := c.ReadLine()
+	if err != nil {
+		return err
+	}
 	parts := strings.SplitN(a, " ", 3)
 	if strings.ToLower(parts[0]) != "authinfo" || strings.ToLower(parts[1]) != "pass" {
 		return ErrSyntax
